@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: smartgrow-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=SmartGrow AI
+      - APP_ENV=production
+      - DEBUG=false
+      - DATABASE_URL=sqlite:///./smartgrow.db
+      - SECRET_KEY=smartgrow-production-secret-key-change-in-prod
+      - ALLOWED_ORIGINS=["http://localhost:5173","http://localhost:80","http://127.0.0.1:5173"]
+    volumes:
+      - smartgrow_data:/app/data
+
+  frontend:
+    image: node:22-alpine
+    container_name: smartgrow-frontend
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ../frontend:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+
+volumes:
+  smartgrow_data:
