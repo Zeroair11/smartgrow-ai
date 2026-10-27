@@ -81,7 +81,7 @@
               </td>
 
               <td class="p-3.5 text-slate-400">
-                {{ new Date(al.created_at).toLocaleString() }}
+                {{ formatDateTime(al.created_at) }}
               </td>
 
               <td class="p-3.5">
@@ -124,6 +124,7 @@
 import { ref, onMounted } from 'vue'
 import apiClient from '@/api/client'
 import type { Alert } from '@/types'
+import { formatDateTime } from '@/utils/date'
 
 const alerts = ref<Alert[]>([])
 const severityFilter = ref('')

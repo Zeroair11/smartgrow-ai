@@ -69,6 +69,14 @@ def get_devices_health(db: Session = Depends(get_db), current_user: User = Depen
     for d in devices:
         readings_count = db.query(SensorReading).filter(SensorReading.device_id == d.device_id).count()
         alerts_count = db.query(Alert).filter(Alert.device_id == d.device_id, Alert.is_resolved == False).count()
+        now = datetime.now(timezone.utc)
+        if d.status == "online" and d.last_seen_at:
+            last_seen = d.last_seen_at if d.last_seen_at.tzinfo else d.last_seen_at.replace(tzinfo=timezone.utc)
+            seconds_ago = max(0.0, (now - last_seen).total_seconds())
+            uptime = max(0.0, round(100.0 - min(100.0, (seconds_ago / 300.0) * 100.0), 1))
+        else:
+            uptime = 0.0
+
         res.append({
             "device_id": d.device_id,
             "name": d.name,
@@ -78,6 +86,6 @@ def get_devices_health(db: Session = Depends(get_db), current_user: User = Depen
             "last_seen_at": d.last_seen_at.isoformat() if d.last_seen_at else None,
             "total_telemetry_packets": readings_count,
             "active_alerts": alerts_count,
-            "uptime_pct": 99.4 if d.status == "online" else 0.0
+            "uptime_pct": uptime
         })
     return res

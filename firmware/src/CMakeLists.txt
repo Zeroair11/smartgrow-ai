@@ -1,0 +1,28 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "firmware_config.c"
+        "dht11.c"
+        "wifi_manager.c"
+        "network_client.c"
+        "telemetry_client.c"
+        "command_manager.c"
+        "safety_manager.c"
+        "actuator_manager.c"
+        "sensor_manager.c"
+        "sensor_calibration.c"
+        "edge_ai.c"
+        "edge_ai_model.c"
+        "ota_manager.c"
+    INCLUDE_DIRS
+        "."
+        "../include"
+    REQUIRES
+        esp_wifi
+        esp_event
+        esp_netif
+        esp_http_client
+        nvs_flash
+        driver
+        esp_adc
+)

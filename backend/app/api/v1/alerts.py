@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.models.entities import Alert, User
-from backend.app.schemas.dtos import AlertRead
+from backend.app.schemas.dtos import AlertRead, AlertCreate
 from backend.app.services.auth_service import get_current_user, require_operator
 from backend.app.services.audit_service import log_audit
 
@@ -24,6 +24,23 @@ def list_alerts(
     if is_resolved is not None:
         q = q.filter(Alert.is_resolved == is_resolved)
     return q.order_by(Alert.created_at.desc()).limit(limit).all()
+
+@router.post("", response_model=AlertRead, status_code=status.HTTP_201_CREATED)
+def create_alert(alert_in: AlertCreate, db: Session = Depends(get_db), current_user: User = Depends(require_operator)):
+    alert = Alert(
+        device_id=alert_in.device_id,
+        zone_id=alert_in.zone_id,
+        severity=alert_in.severity,
+        category=alert_in.category,
+        title=alert_in.title,
+        message=alert_in.message,
+        created_at=datetime.now(timezone.utc)
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    log_audit(db, current_user.id, current_user.email, "CREATE_ALERT", "ALERT", str(alert.id), {"title": alert.title})
+    return alert
 
 @router.post("/{alert_id}/acknowledge", response_model=AlertRead)
 def acknowledge_alert(alert_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_operator)):

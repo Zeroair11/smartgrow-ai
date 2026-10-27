@@ -114,11 +114,11 @@ def create_irrigation_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_operator)
 ):
-    sch = IrrigationSchedule(**sch_in.dict())
+    sch = IrrigationSchedule(**sch_in.model_dump())
     db.add(sch)
     db.commit()
     db.refresh(sch)
-    log_audit(db, current_user.id, current_user.email, "CREATE_IRRIGATION_SCHEDULE", "SCHEDULE", str(sch.id), sch_in.dict())
+    log_audit(db, current_user.id, current_user.email, "CREATE_IRRIGATION_SCHEDULE", "SCHEDULE", str(sch.id), sch_in.model_dump())
     return sch
 
 @router.delete("/schedules/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)

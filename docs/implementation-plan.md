@@ -1,115 +1,75 @@
-# SmartGrow AI — Implementation Plan & Phase Roadmap
+# SmartGrow AI — Comprehensive Implementation, Hardening & Verification Plan
 
-## 1. Project Overview
-SmartGrow AI is an intelligent greenhouse monitoring, edge AI, and irrigation management platform targeting the ESP32-S3 DevModule N16R8 (16MB Flash, 8MB PSRAM), backed by a Python FastAPI backend and a Vue 3 TypeScript frontend.
+**Version:** 2.0.0  
+**Status:** In Progress (Audit Complete, Hardening Active)  
+**Target Board:** ESP32-S3 DevModule N16R8 (16MB Flash, 8MB Octal PSRAM)  
+**Host Platform:** Windows 10/11 x64, GCC 16.1.0, Python 3.11.0, Node.js v24.11.1, Docker 29.8.0  
 
-## 2. Environment & Repository Audit (Phase 0)
-- **Repository state:** Clean workspace (`c:\Users\ADMIN\Downloads\smartgrow-ai`).
-- **Host Environment:**
-  - OS: Windows 10/11
-  - Python: 3.11.0 (with pip and virtualenv support)
-  - Node.js: v24.11.1 / npm 11.6.2
-  - C/C++ Compiler: GCC 14.2.0 (x86_64-w64-mingw32 / ucrt64) for native testing and TinyML validation
-  - Containerization: Docker Desktop available
-  - Version Control: Git available
+---
 
-## 3. Architecture & Tech Stack
-```
-+-------------------------------------------------------------------------+
-|                              SMARTGROW AI                               |
-+-------------------------------------------------------------------------+
-|                                                                         |
-|  [ESP32-S3 Edge Controller]                                             |
-|  - Sensors: Soil Moisture, DHT22 (Temp/Hum), LDR (Light)               |
-|  - Actuators: Relay (Pump), Servo (Ventilation), Buzzer, Status Display |
-|  - Edge AI: Decision Tree / Rule Engine running directly in C/C++       |
-|  - Safety Interlocks: Auto-cutoff, Cooldown, Sensor Fault Protection    |
-|  - Connectivity: Wi-Fi REST Client + Heartbeat + Local Offline Safety   |
-|                                    |                                    |
-|                         HTTP / REST Telemetry & ACK                     |
-|                                    v                                    |
-|  [FastAPI Backend Platform]                                             |
-|  - REST API v1 (Auth, Devices, Telemetry, Edge AI, Automation, etc.)   |
-|  - Database: SQLAlchemy ORM (SQLite for dev, PostgreSQL ready)          |
-|  - Automation Engine: Sensor rules, cooldowns, threshold evaluation    |
-|  - Command Lifecycle: Pending -> Acked -> Executing -> Completed/Failed |
-|  - Background Monitor: Offline detector, command expiry, safety sync    |
-|                                    |                                    |
-|                         REST API / JSON Payloads                        |
-|                                    v                                    |
-|  [Vue 3 + TypeScript Frontend Management Web App]                       |
-|  - Modern Industrial IoT Theme (Tailwind CSS, Glassmorphic Dashboard)   |
-|  - Pinia Stores, Vue Router 4, Axios, ECharts                           |
-|  - 12 Complete Management Modules (Dashboard, Live Monitor, Edge AI,   |
-|    Irrigation, Automation Rules, Alerts, Devices, Greenhouses, etc.)    |
-+-------------------------------------------------------------------------+
-```
+## 1. Executive Strategy
 
-## 4. Phase-by-Phase Plan & Acceptance Criteria
+This plan follows a strict verification-first approach:
+1. **Audit & Baseline (Complete):** Identified toolchains, baseline test outputs, deprecation warnings, missing tests, and safety logic flaws.
+2. **Firmware & Embedded Hardening (Phase 1):** Fix actuator disconnect during watchdog trips, pass sensor readings into command safety checks, guard against disconnected ADC floating probes, fix static buffer bug in `ota_manager.c`, and add unit tests for OTA.
+3. **Edge AI / TinyML Verification (Phase 2):** Document synthetic dataset boundaries, evaluate model against noisy/boundary test samples, test decision tree boundary transitions in C, and ensure AI never overrides safety rules.
+4. **Backend Platform Hardening (Phase 3):** Modernize FastAPI lifespan and Pydantic V2 models, enforce strict command lifecycle transitions, add `idempotency_key` deduplication, enforce $\le 120$s pump limit globally, fix hardcoded analytics, and expand RBAC/security tests.
+5. **Frontend Flow Validation (Phase 4):** Verify that all 12 frontend views bind to real API contracts and handle loading, error, and stale telemetry states.
+6. **OTA & Dual-Partition Lifecycle (Phase 5):** Verify partition table alignments, SHA-256 verification, version downgrade rejection, and backend deployment tracking.
+7. **HIL Test Suite Stratification (Phase 6):** Refactor `hil_runner.py` into distinct Level A (Native Unit), Level B (Firmware Simulation & End-to-End), and Level C (Physical Board) layers with CLI controls (`--sim-only`, `--probe`).
+8. **DevOps & CI/CD Hardening (Phase 7):** Update `.github/workflows/ci.yml` and `docker-compose.yml`.
+9. **Final Acceptance & Reporting (Phase 8-9):** Generate all handover documentation with reproducible verification commands.
 
-### Phase 1: Skeleton & First End-to-End Vertical Flow
-- [x] Workspace structure initialization (`firmware/`, `backend/`, `frontend/`, `ml/`, `tests/`, `docs/`, `deploy/`).
-- [ ] Backend foundation: Python venv setup, FastAPI app, SQLite database setup, user auth, device registry, and telemetry ingestion endpoint.
-- [ ] Firmware foundation: ESP32-S3 PlatformIO project, modular C architecture (`board_config`, `sensor_manager`, `actuator_manager`, `telemetry_client`, `command_manager`), and dual-target support (ESP32-S3 cross-compilation + native GCC test runner/simulator).
-- [ ] Frontend foundation: Vue 3 + TypeScript + Vite + Tailwind CSS + Pinia + Vue Router + Axios API client.
-- [ ] **Acceptance Test 1:** Execute complete telemetry flow: simulated/hardware ESP32-S3 sends telemetry -> backend validates & stores in DB -> frontend fetches and renders on dashboard -> frontend creates pump command -> backend registers command -> firmware polls/receives & ACKs -> status reflects on UI.
+---
 
-### Phase 2: Edge AI & Safety Manager
-- [ ] ML pipeline: Dataset generator based on agronomic thresholds, scikit-learn decision tree training, precision/recall/F1 metrics evaluation, and automated C transpiler (`ml/export/edge_ai_model.h` and `.c`).
-- [ ] Firmware Edge AI module: Feature normalization, inference execution in < 1ms, zero dynamic memory allocation, and model version reporting.
-- [ ] Safety Manager: Maximum pump runtime watchdog, mandatory cooldown timer, sensor fault detection, offline fail-safe state.
-- [ ] **Acceptance Test 2:** Native C unit test verifying 100% agreement between Python predictions and C inference, plus safety tests proving safety interlock overrides AI recommendations when limits are exceeded.
+## 2. Detailed Task Breakdown & Progress Tracking
 
-### Phase 3: Full Backend & Database Platform
-- [ ] Comprehensive SQLAlchemy database schema & migrations.
-- [ ] Complete API v1 routers:
-  - `/api/v1/auth` (JWT login, profile, user management, roles)
-  - `/api/v1/greenhouses` & `/api/v1/zones` (CRUD, threshold configs, device assignment)
-  - `/api/v1/devices` (registration, heartbeat, configs, restart, command history)
-  - `/api/v1/telemetry` (ingest, historical queries, aggregation, CSV export)
-  - `/api/v1/edge-ai` (inference logging, model registry, baseline comparison)
-  - `/api/v1/automation` (rule builder, AND/OR logic, cooldown, execution log)
-  - `/api/v1/irrigation` (manual start/stop, safety duration limit, schedules, history)
-  - `/api/v1/alerts` (severity levels, acknowledge, resolve, audit)
-  - `/api/v1/analytics` (uptime stats, water/pump runtime stats, environmental summaries)
-  - `/api/v1/system` (calibration, timezone, audit logs, backup info)
-  - `/api/v1/ota` (firmware releases, binary upload, deployment tracking)
-- [ ] Background worker tasks: offline device sweep, command expiry watchdog, automation engine trigger.
-- [ ] **Acceptance Test 3:** Pytest suite testing all endpoints, error handling, permission checks, and database integrity.
+### Phase 1: Firmware & Hardware Layer Hardening
+- [x] Baseline audit of C source files (`firmware/src/` and `firmware/include/`).
+- [ ] Fix `safety_manager_tick()`: Call `actuator_manager_set_pump(false)` immediately when safety limits are tripped.
+- [ ] Fix `command_manager_execute()`: Pass active `SensorReadings*` to `safety_manager_can_start_pump()`; reject pump start on sensor fault or extreme temperature.
+- [ ] Fix `sensor_calibration` & `sensor_manager`: Detect out-of-range ADC ($> 3800$ or $< 100$) as sensor faults rather than silently clamping to 0% moisture.
+- [ ] Fix `ota_manager.c`: Remove function-local static variable in `ota_manager_write_chunk()` and add reset in `ota_manager_init()`.
+- [ ] Expand native test suite (`test_firmware_native.c`) to cover OTA, timer rollover, stuck ADC detection, and actuator emergency cutoff.
 
-### Phase 4: Frontend Management Web Application
-- [ ] Implementation of 12 distinct functional modules:
-  1. Dashboard
-  2. Greenhouse & Zone Management
-  3. Device Management
-  4. Live Monitoring (ECharts time-series)
-  5. Edge AI Center (Inference analysis & safety override inspection)
-  6. Automation Rules Builder
-  7. Irrigation Control (with safety modal & command feedback)
-  8. Alerts & Events Center
-  9. Schedule & Calendar
-  10. Analytics & Reports
-  11. System Settings & Sensor Calibration
-  12. Users & Audit Logs
-- [ ] UI Polish: Industrial IoT dark/light styling, responsive sidebar, loading skeletons, empty states, error alerts, badge indicators.
-- [ ] **Acceptance Test 4:** Frontend production build verification (`npm run build`) and integration verification.
+### Phase 2: Edge AI / TinyML Hardening
+- [x] Baseline verification: 500/500 C parity match.
+- [ ] Document dataset generation heuristics and evaluate against boundary conditions.
+- [ ] Create `ml/evaluation/evaluate_model.py` to produce classification report, confusion matrix, and out-of-distribution robustness metrics.
+- [ ] Expand `test_ai_parity.c` to test numerical edge cases ($\pm 0.001$ threshold boundaries, out-of-domain temperatures, and NaN/Inf guards).
 
-### Phase 5: OTA, CI/CD, and Hardware-in-the-Loop (HIL)
-- [ ] ESP32-S3 OTA firmware update manager (partition configuration, checksum verification, rollback support).
-- [ ] GitHub Actions CI workflow (`.github/workflows/ci.yml`) covering backend tests, frontend build, firmware compilation, and native tests.
-- [ ] HIL test runner framework (`tests/hil/hil_runner.py`) with serial connection handler and software simulation fallback.
-- [ ] **Acceptance Test 5:** Execute HIL simulation verifying simulated boot, telemetry push, command reception, and safety cutoff.
+### Phase 3: Backend, Database & API Hardening
+- [x] Baseline verification: 7/7 pytest passed.
+- [ ] Eliminate 21 deprecation warnings: Migrate from `on_event` to FastAPI `lifespan`, replace Pydantic V1 `class Config` with `ConfigDict(from_attributes=True)`, and `.dict()` with `.model_dump()`.
+- [ ] Command service hardening:
+  - Add `idempotency_key` deduplication.
+  - Enforce command state transitions (`pending -> acknowledged -> executing -> completed / failed / rejected`).
+  - Block ACKs from resurrecting `expired`, `rejected`, or `failed` commands.
+  - Enforce $\le 120$s pump duration limit inside `create_command()`.
+- [ ] Analytics API: Compute real uptime percentage based on device telemetry instead of hardcoding 99.4%.
+- [ ] Add comprehensive tests: `backend/tests/test_security_resilience.py` covering RBAC (Viewer forbidden from actuator/config mutations), idempotency, command expiry, and sensor fault handling.
 
-### Phase 6: Hardening, Integration Testing & Deliverables
-- [ ] End-to-end integration test runner validating end-to-end workflows.
-- [ ] Docker Compose setup (`deploy/docker-compose.yml`) for one-command containerized launch.
-- [ ] Production environment file (`.env.example`).
-- [ ] Complete documentation:
-  - `README.md`
-  - `docs/architecture.md`
-  - `docs/api.md`
-  - `docs/hardware.md`
-  - `docs/ai-model.md`
-  - `docs/testing.md`
-  - `docs/deployment.md`
-- [ ] Final acceptance audit and handover report.
+### Phase 4: Frontend Vue 3 Hardening & E2E Verification
+- [x] Baseline verification: `npm run build` succeeds without errors.
+- [ ] Fix `tests/integration/test_end_to_end_flow.py` so it executes independently with proper `sys.path`.
+- [ ] Expand E2E vertical integration suite to cover all 12 key user flows (auth, telemetry, commands, automation, alerts, schedules, OTA).
+
+### Phase 5: OTA & Partitioning Verification
+- [ ] Inspect and verify `partitions_16mb.csv` offsets (0x320000 and 0x920000 for dual 6MB OTA partitions).
+- [ ] Verify SHA-256 integrity checks and version downgrade guards in firmware and backend.
+
+### Phase 6: HIL Runner Refactoring
+- [ ] Refactor `tests/hil/hil_runner.py`:
+  - Add argparse options: `--sim-only`, `--probe`, `--port`.
+  - Add timestamped structured logging.
+  - Report distinct statuses: `PHYSICAL_PASS`, `SIMULATION_PASS`, `SKIPPED`, `FAILED`.
+  - Ensure zero false-positive passes when physical board is missing.
+
+### Phase 7: CI/CD & Deployment Hardening
+- [ ] Update `.github/workflows/ci.yml` to compile `ota_manager.c` and execute the full expanded test suite.
+- [ ] Update `deploy/docker-compose.yml` (remove deprecated version attribute, ensure production/dev separation).
+
+### Phase 8 & 9: Test Evidence & Handover Documentation
+- [ ] Compile full test evidence log.
+- [ ] Update `docs/testing.md`, `docs/known-limitations.md`, `docs/hardware-validation.md`, `docs/security-review.md`, and `docs/release-checklist.md`.
+- [ ] Produce Final Acceptance Report.

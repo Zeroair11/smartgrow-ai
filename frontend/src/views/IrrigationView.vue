@@ -131,7 +131,7 @@
               <td class="p-3">
                 <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300">{{ ev.start_reason }}</span>
               </td>
-              <td class="p-3 text-slate-400">{{ new Date(ev.started_at).toLocaleString() }}</td>
+              <td class="p-3 text-slate-400">{{ formatDateTime(ev.started_at) }}</td>
               <td class="p-3 text-cyan-400 font-bold">{{ ev.duration_seconds }}s</td>
               <td class="p-3 text-slate-300">{{ ev.volume_liters_est.toFixed(2) }} L</td>
               <td class="p-3 text-slate-400">{{ ev.stop_reason }}</td>
@@ -160,6 +160,7 @@
 import { ref, computed, onMounted } from 'vue'
 import apiClient from '@/api/client'
 import type { Device, IrrigationEvent, DeviceCommand } from '@/types'
+import { formatDateTime } from '@/utils/date'
 
 const devices = ref<Device[]>([])
 const selectedDevice = ref('')

@@ -1,11 +1,12 @@
 #include "sensor_calibration.h"
+#include "project_config.h"
 
 void sensor_calibration_init(SoilCalibrationConfig *config) {
     if (!config) return;
     /* Default factory baseline for typical capacitive soil moisture sensor v1.2 / v2.0 on 12-bit ADC */
-    config->adc_dry_raw   = 3200;
-    config->adc_wet_raw   = 1200;
-    config->vref_mv       = 3300.0f;
+    config->adc_dry_raw   = PROJECT_SOIL_ADC_DRY_RAW;
+    config->adc_wet_raw   = PROJECT_SOIL_ADC_WET_RAW;
+    config->vref_mv       = PROJECT_ADC_VREF_MV;
     config->is_calibrated = false;
 }
 
@@ -47,3 +48,14 @@ bool sensor_calibration_set_points(SoilCalibrationConfig *config, uint16_t dry_r
     config->is_calibrated = true;
     return true;
 }
+
+bool sensor_calibration_is_adc_plausible(uint16_t raw_adc) {
+    /* 12-bit ADC (0 - 4095).
+       Readings >= PROJECT_SOIL_RAW_MAX_PLAUSIBLE indicate floating / disconnected probe or open circuit wire.
+       Readings <= PROJECT_SOIL_RAW_MIN_PLAUSIBLE indicate short circuit to ground. */
+    if (raw_adc >= PROJECT_SOIL_RAW_MAX_PLAUSIBLE || raw_adc <= PROJECT_SOIL_RAW_MIN_PLAUSIBLE) {
+        return false;
+    }
+    return true;
+}
+

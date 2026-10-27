@@ -22,7 +22,7 @@ def create_zone(zone_in: ZoneCreate, db: Session = Depends(get_db), current_user
     if not gh:
         raise HTTPException(status_code=404, detail="Parent greenhouse not found")
     
-    zone = Zone(**zone_in.dict())
+    zone = Zone(**zone_in.model_dump())
     db.add(zone)
     db.commit()
     db.refresh(zone)

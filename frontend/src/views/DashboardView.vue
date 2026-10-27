@@ -81,7 +81,7 @@
           <span>📡</span> Live Sensor Telemetry (Device: <span class="text-emerald-400">{{ latestReading?.device_id || 'Waiting for edge data...' }}</span>)
         </h3>
         <span v-if="latestReading" class="text-xs font-mono text-slate-400">
-          Seq: #{{ latestReading.sequence }} • {{ new Date(latestReading.recorded_at).toLocaleTimeString() }}
+          Seq: #{{ latestReading.sequence }} • {{ formatTime(latestReading.recorded_at) }}
         </span>
       </div>
 
@@ -93,11 +93,13 @@
             <span>💧</span>
           </div>
           <div class="mt-2 flex items-baseline gap-1">
-            <span class="text-3xl font-extrabold font-mono text-cyan-400">{{ latestReading.soil_moisture_pct.toFixed(1) }}</span>
-            <span class="text-sm font-mono text-slate-400">%</span>
+            <span class="text-3xl font-extrabold font-mono" :class="latestReading.soil_moisture_pct != null ? 'text-cyan-400' : 'text-red-400 text-2xl'">
+              {{ latestReading.soil_moisture_pct != null ? latestReading.soil_moisture_pct.toFixed(1) : 'FAULT' }}
+            </span>
+            <span v-if="latestReading.soil_moisture_pct != null" class="text-sm font-mono text-slate-400">%</span>
           </div>
           <div class="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-            <div class="bg-cyan-500 h-1.5 rounded-full transition-all duration-500" :style="{ width: `${Math.min(latestReading.soil_moisture_pct, 100)}%` }"></div>
+            <div class="h-1.5 rounded-full transition-all duration-500" :class="latestReading.soil_moisture_pct != null ? 'bg-cyan-500' : 'bg-red-500'" :style="{ width: `${latestReading.soil_moisture_pct != null ? Math.min(latestReading.soil_moisture_pct, 100) : 0}%` }"></div>
           </div>
         </div>
 
@@ -108,11 +110,13 @@
             <span>🌡️</span>
           </div>
           <div class="mt-2 flex items-baseline gap-1">
-            <span class="text-3xl font-extrabold font-mono text-amber-400">{{ latestReading.temperature_c.toFixed(1) }}</span>
-            <span class="text-sm font-mono text-slate-400">°C</span>
+            <span class="text-3xl font-extrabold font-mono" :class="latestReading.temperature_c != null ? 'text-amber-400' : 'text-red-400 text-2xl'">
+              {{ latestReading.temperature_c != null ? latestReading.temperature_c.toFixed(1) : 'FAULT' }}
+            </span>
+            <span v-if="latestReading.temperature_c != null" class="text-sm font-mono text-slate-400">°C</span>
           </div>
           <div class="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-            <div class="bg-amber-500 h-1.5 rounded-full transition-all duration-500" :style="{ width: `${Math.min((latestReading.temperature_c / 50) * 100, 100)}%` }"></div>
+            <div class="h-1.5 rounded-full transition-all duration-500" :class="latestReading.temperature_c != null ? 'bg-amber-500' : 'bg-red-500'" :style="{ width: `${latestReading.temperature_c != null ? Math.min((latestReading.temperature_c / 50) * 100, 100) : 0}%` }"></div>
           </div>
         </div>
 
@@ -123,11 +127,13 @@
             <span>💨</span>
           </div>
           <div class="mt-2 flex items-baseline gap-1">
-            <span class="text-3xl font-extrabold font-mono text-indigo-400">{{ latestReading.humidity_pct.toFixed(1) }}</span>
-            <span class="text-sm font-mono text-slate-400">%</span>
+            <span class="text-3xl font-extrabold font-mono" :class="latestReading.humidity_pct != null ? 'text-indigo-400' : 'text-red-400 text-2xl'">
+              {{ latestReading.humidity_pct != null ? latestReading.humidity_pct.toFixed(1) : 'FAULT' }}
+            </span>
+            <span v-if="latestReading.humidity_pct != null" class="text-sm font-mono text-slate-400">%</span>
           </div>
           <div class="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-            <div class="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" :style="{ width: `${Math.min(latestReading.humidity_pct, 100)}%` }"></div>
+            <div class="h-1.5 rounded-full transition-all duration-500" :class="latestReading.humidity_pct != null ? 'bg-indigo-500' : 'bg-red-500'" :style="{ width: `${latestReading.humidity_pct != null ? Math.min(latestReading.humidity_pct, 100) : 0}%` }"></div>
           </div>
         </div>
 
@@ -138,11 +144,13 @@
             <span>☀️</span>
           </div>
           <div class="mt-2 flex items-baseline gap-1">
-            <span class="text-3xl font-extrabold font-mono text-yellow-400">{{ latestReading.light_level_pct.toFixed(1) }}</span>
-            <span class="text-sm font-mono text-slate-400">%</span>
+            <span class="text-3xl font-extrabold font-mono" :class="latestReading.light_level_pct != null ? 'text-yellow-400' : 'text-red-400 text-2xl'">
+              {{ latestReading.light_level_pct != null ? latestReading.light_level_pct.toFixed(1) : 'FAULT' }}
+            </span>
+            <span v-if="latestReading.light_level_pct != null" class="text-sm font-mono text-slate-400">%</span>
           </div>
           <div class="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-            <div class="bg-yellow-500 h-1.5 rounded-full transition-all duration-500" :style="{ width: `${Math.min(latestReading.light_level_pct, 100)}%` }"></div>
+            <div class="h-1.5 rounded-full transition-all duration-500" :class="latestReading.light_level_pct != null ? 'bg-yellow-500' : 'bg-red-500'" :style="{ width: `${latestReading.light_level_pct != null ? Math.min(latestReading.light_level_pct, 100) : 0}%` }"></div>
           </div>
         </div>
       </div>
@@ -202,7 +210,7 @@
               <p class="font-semibold">{{ alert.title }}</p>
               <p class="text-[11px] text-slate-400 mt-0.5">{{ alert.message }}</p>
             </div>
-            <span class="text-[10px] font-mono shrink-0 text-slate-500">{{ new Date(alert.created_at).toLocaleTimeString() }}</span>
+            <span class="text-[10px] font-mono shrink-0 text-slate-500">{{ formatTime(alert.created_at) }}</span>
           </div>
         </div>
         <div v-else class="text-center py-8 text-xs text-slate-500 font-mono">
@@ -259,6 +267,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import apiClient from '@/api/client'
 import type { DashboardSummary, SensorReading, Alert } from '@/types'
+import { formatTime } from '@/utils/date'
 
 const summary = ref<DashboardSummary | null>(null)
 const latestReading = ref<SensorReading | null>(null)

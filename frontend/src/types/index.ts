@@ -38,7 +38,7 @@ export interface Device {
   device_id: string
   name: string
   zone_id?: number
-  status: 'online' | 'offline' | 'degraded'
+  status: 'online' | 'offline' | 'degraded' | 'revoked' | 'decommissioned'
   firmware_version: string
   model_version: string
   ip_address?: string
@@ -65,10 +65,13 @@ export interface SensorReading {
   device_id: string
   zone_id?: number
   sequence: number
-  soil_moisture_pct: number
-  temperature_c: number
-  humidity_pct: number
-  light_level_pct: number
+  soil_moisture_pct: number | null
+  temperature_c: number | null
+  humidity_pct: number | null
+  light_level_pct: number | null
+  soil_valid?: boolean
+  dht_valid?: boolean
+  light_valid?: boolean
   ai_class: number
   ai_confidence: number
   model_version: string
@@ -167,10 +170,10 @@ export interface AIInferenceEvent {
   device_id: string
   zone_id?: number
   recorded_at: string
-  soil_moisture_pct: number
-  temperature_c: number
-  humidity_pct: number
-  light_level_pct: number
+  soil_moisture_pct: number | null
+  temperature_c: number | null
+  humidity_pct: number | null
+  light_level_pct: number | null
   predicted_class: number
   predicted_label: string
   confidence: number

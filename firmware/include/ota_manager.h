@@ -30,6 +30,8 @@ typedef struct {
     char     target_version[32];
     char     target_sha256[65];
     int      error_code;
+    size_t   bytes_written;
+    size_t   total_size;
 } OTAStatus;
 
 /**

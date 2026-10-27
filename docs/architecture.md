@@ -20,7 +20,7 @@ Key Design Tenets:
 |  [Sensors & ADC]               [Edge Computing]             [Actuators & Relays]  |
 |  - Soil Moisture (GPIO 1) ---> Sensor Manager               - Pump Relay (GPIO 10)|
 |  - LDR Light (GPIO 2)     ---> Sensor Calibration           - Vent Servo (GPIO 11)|
-|  - DHT22 Temp/Hum (GPIO 4)---> [TinyML Decision Tree]       - Buzzer (GPIO 12)    |
+|  - DHT11 Temp/Hum (GPIO 4)---> [TinyML Decision Tree]       - Buzzer (GPIO 12)    |
 |                                       |                     - Status LED (GPIO 21)|
 |                                       v                               ^           |
 |                            [Firmware Safety Manager] -----------------+           |
@@ -97,3 +97,46 @@ When the TinyML Decision Tree predicts `AI_CLASS_NEED_WATER`:
 - If a cooldown is active or sensors report invalid numbers, the Safety Manager **overrides** the recommendation.
 - The event is recorded in the telemetry packet as `safety_override=true`, action=`SAFETY_OVERRIDE_BLOCK_PUMP`.
 - The pump remains physically unpowered.
+
+---
+
+## 5. FreeRTOS Task Architecture & Network Concurrency
+
+The ESP32-S3 firmware enforces strict temporal isolation across dual Xtensa LX7 cores:
+
+| Task Name | Core | Priority | Stack Size | Periodicity | Responsibilities |
+|---|---|---|---|---|---|
+| `safety_sensor_task` | Core 0 | High (5) | 4,096 B | 100 ms | Hard real-time safety watchdog (`safety_manager_tick`), periodic ADC/sensor acquisition (2000 ms), TinyML Decision Tree inference (`edge_ai_infer`), thread-safe telemetry queuing. |
+| `network_uplink_task` | Core 1 | Med (3) | 6,144 B | 500 ms poll | Wi-Fi exponential backoff tick, device enrollment (`POST /devices/register`), periodic telemetry upload (`POST /telemetry`, 5000 ms), downlink command polling (`GET /devices/{id}/poll-commands`, 3000 ms), immediate ACK dispatch. |
+| `serial_hil_task` | Core 0 | Low (2) | 2,048 B | 100 ms | UART0 serial protocol responder (responds to `PING` with `PONG ESP32-S3 READY`) for physical test bench integration. |
+
+### Network Resilience & Safety Invariant
+- **Safety Loop Independence:** Network latency, DNS resolution delays, HTTP timeouts, and Wi-Fi disconnects execute exclusively on Core 1 and can **never** block or delay Core 0's 100 ms `safety_manager_tick` loop.
+- **Actuator Power State:** If Wi-Fi is lost, the pump relay defaults to its hardware-safe state (`!RELAY_PUMP_ACTIVE_LEVEL`). Network reconnection never causes previous commands to be re-executed.
+
+---
+
+## 6. Centralized Firmware Configuration Architecture
+
+The firmware enforces a single source of truth for all operational, hardware, networking, safety, and sensor configuration parameters via `firmware_config.h` and `config_defaults.h`.
+
+### 6.1. Configuration Hierarchy & Precedence
+1. **Developer / Environment Overrides:** `firmware/include/config_local.h` (git-ignored, template in `config_local.h.example`).
+2. **Compile-Time Baseline Defaults:** `firmware/include/config_defaults.h`.
+3. **Runtime Master Configuration Store:** Managed by `firmware_config_init()`, validated by `firmware_config_validate()`, and queried via `firmware_config_get()`.
+
+### 6.2. Configuration Groups
+- **Device Identity:** Unique `device_id` (fallback or provisioning), `device_name`, `firmware_version`, `hardware_rev`, `schema_version`, and unique `boot_id`.
+- **Wi-Fi Connectivity:** `ssid`, `password`, `max_retries`, exponential backoff parameters (`reconnect_initial_delay_ms`, `reconnect_max_delay_ms`, `reconnect_backoff_factor`), and `connection_timeout_ms`.
+- **Backend & Network:** `host`, `port`, `base_path`, `telemetry_endpoint`, `register_endpoint`, `poll_commands_endpoint`, `ack_endpoint`, `telemetry_interval_ms` (5000ms), `command_poll_interval_ms` (3000ms), and `http_timeout_ms` (5000ms).
+- **DHT11 Air Sensor:** `pin_data` (GPIO 4), `sample_interval_ms` (2000ms), `read_timeout_ms` (50ms), `max_consecutive_errors` (3), `min_temp_c` (0.0°C), `max_temp_c` (50.0°C), `min_humidity_pct` (20.0%), and `max_humidity_pct` (90.0%).
+- **Soil & Light Sensors:** ADC pin channels, dry/wet ADC calibration bounds (`adc_dry_value`, `adc_wet_value`), plausible thresholds (`adc_min_plausible`, `adc_max_plausible`), and LDR scaling.
+- **Actuators & Safety:** Active-low pump relay configuration (`relay_active_level=0`, `relay_inactive_level=1`), servo PWM parameters, buzzer/LED pins, `max_pump_runtime_s` (120s), `min_cooldown_s` (180s), and `require_sensor_validity` (true).
+- **Edge AI & TinyML:** Model version, feature scaling factors, confidence thresholds, and inference periodicity.
+- **OTA & Diagnostics:** OTA update URLs, poll intervals, serial baud rate (115200), and log level.
+
+### 6.3. Secret Isolation & Logging Security
+- Mặc định credentials và secret (`wifi_password`, `device_token`) được mask hoàn toàn thành `********` khi log ra UART thông qua `firmware_config_log_safe()`.
+- File `config_local.h` chứa thông tin nhạy cảm được cấu hình trong `.gitignore`, không bao giờ commit vào Git repository.
+
+

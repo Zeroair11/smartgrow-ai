@@ -19,7 +19,7 @@ def create_greenhouse(gh_in: GreenhouseCreate, db: Session = Depends(get_db), cu
     if existing:
         raise HTTPException(status_code=400, detail="Greenhouse code already exists")
     
-    gh = Greenhouse(**gh_in.dict())
+    gh = Greenhouse(**gh_in.model_dump())
     db.add(gh)
     db.commit()
     db.refresh(gh)

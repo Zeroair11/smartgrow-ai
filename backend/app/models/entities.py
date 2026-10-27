@@ -1,9 +1,32 @@
 import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Index
+    Column, Integer, String, Float, Boolean, ForeignKey, Text, Index, types
 )
 from sqlalchemy.orm import relationship
 from backend.app.core.database import Base
+
+class UTCDateTime(types.TypeDecorator):
+    """Ensures DateTime values stored in SQLite/databases are returned with UTC timezone."""
+    impl = types.DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and isinstance(value, datetime.datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=datetime.timezone.utc)
+            else:
+                value = value.astimezone(datetime.timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and isinstance(value, datetime.datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=datetime.timezone.utc)
+            else:
+                value = value.astimezone(datetime.timezone.utc)
+        return value
+
+DateTime = UTCDateTime
 
 def utcnow():
     return datetime.datetime.now(datetime.timezone.utc)
@@ -101,10 +124,13 @@ class SensorReading(Base):
     zone_id = Column(Integer, nullable=True)
     sequence = Column(Integer, nullable=False)
     boot_id = Column(String(64), nullable=True)
-    soil_moisture_pct = Column(Float, nullable=False)
-    temperature_c = Column(Float, nullable=False)
-    humidity_pct = Column(Float, nullable=False)
-    light_level_pct = Column(Float, nullable=False)
+    soil_moisture_pct = Column(Float, nullable=True)
+    temperature_c = Column(Float, nullable=True)
+    humidity_pct = Column(Float, nullable=True)
+    light_level_pct = Column(Float, nullable=True)
+    soil_valid = Column(Boolean, default=True, nullable=False)
+    dht_valid = Column(Boolean, default=True, nullable=False)
+    light_valid = Column(Boolean, default=True, nullable=False)
     ai_class = Column(Integer, default=0)
     ai_confidence = Column(Float, default=1.0)
     model_version = Column(String(50), default="v1.0")
@@ -129,6 +155,7 @@ class DeviceCommand(Base):
     device_id = Column(String(64), ForeignKey("devices.device_id", ondelete="CASCADE"), nullable=False)
     command_type = Column(String(50), nullable=False)
     payload_json = Column(Text, nullable=True)
+    idempotency_key = Column(String(128), index=True, nullable=True)
     status = Column(String(50), default="pending", nullable=False)  # pending, acknowledged, executing, completed, failed, expired, rejected
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
@@ -230,10 +257,10 @@ class AIInferenceEvent(Base):
     device_id = Column(String(64), nullable=False)
     zone_id = Column(Integer, nullable=True)
     recorded_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    soil_moisture_pct = Column(Float, nullable=False)
-    temperature_c = Column(Float, nullable=False)
-    humidity_pct = Column(Float, nullable=False)
-    light_level_pct = Column(Float, nullable=False)
+    soil_moisture_pct = Column(Float, nullable=True)
+    temperature_c = Column(Float, nullable=True)
+    humidity_pct = Column(Float, nullable=True)
+    light_level_pct = Column(Float, nullable=True)
     predicted_class = Column(Integer, nullable=False)
     predicted_label = Column(String(50), nullable=False)
     confidence = Column(Float, default=1.0)

@@ -47,6 +47,8 @@ compile_commands.json
 *.bin
 *.elf
 *.hex
+firmware/include/config_local.h
+firmware/test/*.exe
 
 # IDE
 .vscode/
@@ -57,3 +59,13 @@ compile_commands.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Python Test & Cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Storage & Backups
+backups/
+firmware_storage/
+*.exe

@@ -7,14 +7,26 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <a
-          href="/api/v1/telemetry/export-csv"
-          target="_blank"
-          class="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5"
+        <button
+          @click="handleExportCsv"
+          :disabled="isExporting"
+          class="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5"
         >
-          <span>📥</span> Download Full Dataset (CSV)
-        </a>
+          <span v-if="isExporting" class="animate-spin text-white">⏳</span>
+          <span v-else>📥</span>
+          <span>{{ isExporting ? 'Exporting...' : 'Download Full Dataset (CSV)' }}</span>
+        </button>
       </div>
+    </div>
+
+    <!-- Export Notification Toast -->
+    <div
+      v-if="toastMessage"
+      class="px-4 py-2.5 rounded-xl border text-xs font-mono transition-all flex items-center justify-between"
+      :class="toastMessage.includes('Failed') ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'"
+    >
+      <span>{{ toastMessage }}</span>
+      <button @click="toastMessage = null" class="text-slate-400 hover:text-white ml-2">✕</button>
     </div>
 
     <!-- Fleet Health Overview Table -->
@@ -72,8 +84,31 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import apiClient from '@/api/client'
+import { downloadCsvFromApi } from '@/utils/csv'
 
 const healthData = ref<any[]>([])
+const isExporting = ref(false)
+const toastMessage = ref<string | null>(null)
+
+async function handleExportCsv() {
+  if (isExporting.value) return
+  isExporting.value = true
+  toastMessage.value = null
+  try {
+    const filename = await downloadCsvFromApi('/telemetry/export-csv', {
+      params: { limit: 5000 },
+      defaultFilename: `smartgrow_full_dataset_${Date.now()}.csv`
+    })
+    toastMessage.value = `Successfully exported ${filename}`
+    setTimeout(() => { toastMessage.value = null }, 3500)
+  } catch (err: any) {
+    console.error('Failed to export dataset', err)
+    toastMessage.value = 'Failed to export CSV dataset. Please check authentication and network.'
+    setTimeout(() => { toastMessage.value = null }, 4000)
+  } finally {
+    isExporting.value = false
+  }
+}
 
 async function fetchHealth() {
   try {

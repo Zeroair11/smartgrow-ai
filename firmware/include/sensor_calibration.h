@@ -35,6 +35,11 @@ float sensor_calibration_raw_to_moisture_pct(const SoilCalibrationConfig *config
  */
 bool sensor_calibration_set_points(SoilCalibrationConfig *config, uint16_t dry_raw, uint16_t wet_raw);
 
+/**
+ * @brief Check whether raw ADC reading is electrically plausible (not shorted or disconnected)
+ */
+bool sensor_calibration_is_adc_plausible(uint16_t raw_adc);
+
 #ifdef __cplusplus
 }
 #endif

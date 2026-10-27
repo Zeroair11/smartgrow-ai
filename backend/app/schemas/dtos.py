@@ -1,6 +1,7 @@
+import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, computed_field
 
 # Auth Schemas
 class TokenResponse(BaseModel):
@@ -20,6 +21,13 @@ class UserRegister(BaseModel):
     full_name: Optional[str] = None
     role: str = "operator"
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = Field(default=None, min_length=8)
+
 class UserRead(BaseModel):
     id: int
     email: str
@@ -29,8 +37,7 @@ class UserRead(BaseModel):
     is_superuser: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Greenhouse & Zone
 class GreenhouseCreate(BaseModel):
@@ -55,8 +62,7 @@ class GreenhouseRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ZoneCreate(BaseModel):
     greenhouse_id: int
@@ -90,8 +96,7 @@ class ZoneRead(BaseModel):
     is_active: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Device Schemas
 class DeviceRegister(BaseModel):
@@ -102,6 +107,11 @@ class DeviceRegister(BaseModel):
     model_version: Optional[str] = "v1.0"
     mac_address: Optional[str] = None
     registration_token: str
+
+class DeviceUpdate(BaseModel):
+    name: Optional[str] = None
+    zone_id: Optional[int] = None
+    status: Optional[str] = None
 
 class DeviceRead(BaseModel):
     id: int
@@ -117,8 +127,7 @@ class DeviceRead(BaseModel):
     last_seen_at: Optional[datetime] = None
     registered_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DeviceConfigUpdate(BaseModel):
     telemetry_interval_s: Optional[int] = None
@@ -139,8 +148,7 @@ class DeviceConfigRead(BaseModel):
     is_synced: bool
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Telemetry Schemas
 class TelemetryIngest(BaseModel):
@@ -149,10 +157,13 @@ class TelemetryIngest(BaseModel):
     boot_id: Optional[str] = None
     sequence: int
     timestamp_ms: Optional[int] = None
-    soil_moisture_pct: float = Field(ge=0.0, le=100.0)
-    temperature_c: float = Field(ge=-20.0, le=80.0)
-    humidity_pct: float = Field(ge=0.0, le=100.0)
-    light_level_pct: float = Field(ge=0.0, le=100.0)
+    soil_moisture_pct: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    temperature_c: Optional[float] = Field(default=None, ge=-20.0, le=80.0)
+    humidity_pct: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    light_level_pct: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    soil_valid: Optional[bool] = True
+    dht_valid: Optional[bool] = True
+    light_valid: Optional[bool] = True
     ai_class: Optional[int] = 0
     ai_confidence: Optional[float] = 1.0
     model_version: Optional[str] = "v1.0"
@@ -166,10 +177,13 @@ class SensorReadingRead(BaseModel):
     device_id: str
     zone_id: Optional[int] = None
     sequence: int
-    soil_moisture_pct: float
-    temperature_c: float
-    humidity_pct: float
-    light_level_pct: float
+    soil_moisture_pct: Optional[float] = None
+    temperature_c: Optional[float] = None
+    humidity_pct: Optional[float] = None
+    light_level_pct: Optional[float] = None
+    soil_valid: Optional[bool] = True
+    dht_valid: Optional[bool] = True
+    light_valid: Optional[bool] = True
     ai_class: int
     ai_confidence: float
     model_version: str
@@ -179,15 +193,15 @@ class SensorReadingRead(BaseModel):
     health_status: str
     recorded_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Command Schemas
 class CommandCreate(BaseModel):
-    command_type: str  # PUMP_START, PUMP_STOP, VENT_SET, BUZZER_BEEP, RESTART
+    command_type: str  # PUMP_START, PUMP_STOP, VENT_SET, BUZZER_BEEP, RESTART, CONFIG_UPDATE
     param_val: Optional[float] = 0.0
     duration_s: Optional[int] = 30
     ttl_s: Optional[int] = 300
+    idempotency_key: Optional[str] = None
 
 class CommandAck(BaseModel):
     command_id: str
@@ -201,6 +215,7 @@ class CommandRead(BaseModel):
     device_id: str
     command_type: str
     payload_json: Optional[str] = None
+    idempotency_key: Optional[str] = None
     status: str
     created_at: datetime
     expires_at: datetime
@@ -209,8 +224,36 @@ class CommandRead(BaseModel):
     result_json: Optional[str] = None
     error_code: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def expires_at_sec(self) -> int:
+        if self.expires_at:
+            return int(self.expires_at.timestamp())
+        return 0
+
+    @computed_field
+    @property
+    def param_val(self) -> float:
+        if self.payload_json:
+            try:
+                data = json.loads(self.payload_json)
+                return float(data.get("param_val", 0.0) or data.get("duration_s", 0.0) or 0.0)
+            except Exception:
+                pass
+        return 0.0
+
+    @computed_field
+    @property
+    def duration_s(self) -> int:
+        if self.payload_json:
+            try:
+                data = json.loads(self.payload_json)
+                return int(data.get("duration_s", 0) or data.get("param_val", 0) or 30)
+            except Exception:
+                pass
+        return 30
 
 # Automation Rule Schemas
 class AutomationRuleCreate(BaseModel):
@@ -240,8 +283,7 @@ class AutomationRuleRead(BaseModel):
     execution_count: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Irrigation Schemas
 class IrrigationManualStart(BaseModel):
@@ -263,8 +305,7 @@ class IrrigationEventRead(BaseModel):
     volume_liters_est: float
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class IrrigationScheduleCreate(BaseModel):
     name: str
@@ -285,8 +326,7 @@ class IrrigationScheduleRead(BaseModel):
     last_run_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Alert Schemas
 class AlertCreate(BaseModel):
@@ -311,8 +351,7 @@ class AlertRead(BaseModel):
     acknowledged_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Edge AI Schemas
 class AIInferenceEventRead(BaseModel):
@@ -331,8 +370,7 @@ class AIInferenceEventRead(BaseModel):
     safety_override: bool
     final_action: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AIModelRead(BaseModel):
     id: int
@@ -344,8 +382,7 @@ class AIModelRead(BaseModel):
     is_active: bool
     deployed_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Analytics / Overview Dashboard Schemas
 class DashboardSummary(BaseModel):
@@ -372,8 +409,7 @@ class AuditLogRead(BaseModel):
     ip_address: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # OTA Schemas
 class FirmwareReleaseCreate(BaseModel):
@@ -389,8 +425,7 @@ class FirmwareReleaseRead(BaseModel):
     is_active: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OTADeploymentRead(BaseModel):
     id: int
@@ -401,5 +436,4 @@ class OTADeploymentRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

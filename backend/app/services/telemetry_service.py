@@ -17,6 +17,8 @@ def ingest_telemetry(db: Session, telemetry: TelemetryIngest) -> SensorReading:
     device = db.query(Device).filter(Device.device_id == telemetry.device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail=f"Device {telemetry.device_id} not registered")
+    if device.status in ["revoked", "decommissioned"]:
+        raise HTTPException(status_code=403, detail="Device registration is revoked or decommissioned")
 
     now = datetime.now(timezone.utc)
 
@@ -39,15 +41,22 @@ def ingest_telemetry(db: Session, telemetry: TelemetryIngest) -> SensorReading:
             # Idempotent skip: return existing without double-counting
             return existing
 
+    soil_valid = bool(telemetry.soil_valid) if telemetry.soil_valid is not None else (telemetry.soil_moisture_pct is not None)
+    dht_valid = bool(telemetry.dht_valid) if telemetry.dht_valid is not None else (telemetry.temperature_c is not None and telemetry.humidity_pct is not None)
+    light_valid = bool(telemetry.light_valid) if telemetry.light_valid is not None else (telemetry.light_level_pct is not None)
+
     reading = SensorReading(
         device_id=telemetry.device_id,
         zone_id=device.zone_id,
         sequence=telemetry.sequence,
         boot_id=telemetry.boot_id,
-        soil_moisture_pct=telemetry.soil_moisture_pct,
-        temperature_c=telemetry.temperature_c,
-        humidity_pct=telemetry.humidity_pct,
-        light_level_pct=telemetry.light_level_pct,
+        soil_moisture_pct=telemetry.soil_moisture_pct if soil_valid else None,
+        temperature_c=telemetry.temperature_c if dht_valid else None,
+        humidity_pct=telemetry.humidity_pct if dht_valid else None,
+        light_level_pct=telemetry.light_level_pct if light_valid else None,
+        soil_valid=soil_valid,
+        dht_valid=dht_valid,
+        light_valid=light_valid,
         ai_class=telemetry.ai_class or 0,
         ai_confidence=telemetry.ai_confidence or 1.0,
         model_version=telemetry.model_version or "v1.0",
@@ -65,10 +74,10 @@ def ingest_telemetry(db: Session, telemetry: TelemetryIngest) -> SensorReading:
         device_id=telemetry.device_id,
         zone_id=device.zone_id,
         recorded_at=now,
-        soil_moisture_pct=telemetry.soil_moisture_pct,
-        temperature_c=telemetry.temperature_c,
-        humidity_pct=telemetry.humidity_pct,
-        light_level_pct=telemetry.light_level_pct,
+        soil_moisture_pct=telemetry.soil_moisture_pct if soil_valid else None,
+        temperature_c=telemetry.temperature_c if dht_valid else None,
+        humidity_pct=telemetry.humidity_pct if dht_valid else None,
+        light_level_pct=telemetry.light_level_pct if light_valid else None,
         predicted_class=telemetry.ai_class or 0,
         predicted_label=ai_label,
         confidence=telemetry.ai_confidence or 1.0,
@@ -78,18 +87,39 @@ def ingest_telemetry(db: Session, telemetry: TelemetryIngest) -> SensorReading:
     )
     db.add(ai_event)
 
-    # Safety: Extreme temperature anomaly alert check
-    if telemetry.temperature_c > 45.0 or telemetry.temperature_c < 0.0:
-        alert = Alert(
+    # Sensor Acquisition Fault Alert
+    if not soil_valid or not dht_valid or not light_valid:
+        faulty = []
+        if not soil_valid:
+            faulty.append("Soil Moisture ADC")
+        if not dht_valid:
+            faulty.append("DHT11 (Temp/Hum)")
+        if not light_valid:
+            faulty.append("Light Sensor")
+        fault_alert = Alert(
             device_id=telemetry.device_id,
             zone_id=device.zone_id,
-            severity="critical" if telemetry.temperature_c > 50.0 else "warning",
+            severity="warning",
             category="sensor",
-            title=f"Extreme Temperature Reading: {telemetry.temperature_c:.1f}°C",
-            message=f"Device {telemetry.device_id} detected environmental temperature outside safe growth range.",
+            title=f"Sensor Acquisition Fault: {', '.join(faulty)}",
+            message=f"Device {telemetry.device_id} detected plausible reading/hardware fault. Irrigation pump held OFF by fail-safe.",
             created_at=now
         )
-        db.add(alert)
+        db.add(fault_alert)
+
+    # Safety: Extreme temperature anomaly alert check (only when DHT11 measurement is valid)
+    if dht_valid and telemetry.temperature_c is not None:
+        if telemetry.temperature_c > 45.0 or telemetry.temperature_c < 0.0:
+            alert = Alert(
+                device_id=telemetry.device_id,
+                zone_id=device.zone_id,
+                severity="critical" if telemetry.temperature_c > 50.0 else "warning",
+                category="sensor",
+                title=f"Extreme Temperature Reading: {telemetry.temperature_c:.1f}°C",
+                message=f"Device {telemetry.device_id} detected environmental temperature outside safe growth range.",
+                created_at=now
+            )
+            db.add(alert)
 
     db.commit()
     db.refresh(reading)

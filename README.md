@@ -17,9 +17,9 @@ SmartGrow AI is an enterprise-grade IoT platform designed for intelligent greenh
 |                              SMARTGROW AI                               |
 +-------------------------------------------------------------------------+
 |  [ESP32-S3 Edge Controller]                                             |
-|  - Soil Moisture (GPIO 1), LDR (GPIO 2), DHT22 (GPIO 4)                 |
-|  - Pump Relay (GPIO 10, Active-Low), SG90 Vent Servo (GPIO 11)          |
-|  - Edge AI: Decision Tree running in zero-heap deterministic C (14µs)   |
+|  - Soil Moisture (GPIO 1), LDR (GPIO 2), DHT11 (GPIO 4)                 |
+|  - Pump Relay (GPIO 10, Configurable Polarity), SG90 Vent Servo (GPIO 11)|
+|  - Edge AI: Decision Tree running in zero-heap deterministic C (5µs)    |
 |  - Safety Interlocks: Max pump runtime (120s), Min cooldown (180s)      |
 |                                    |                                    |
 |                       HTTP Telemetry & Commands                         |
@@ -85,6 +85,8 @@ To launch the complete containerized stack in one command:
 ```powershell
 docker compose -f deploy/docker-compose.yml up --build -d
 ```
+- Persistent SQLite database is mounted inside Docker named volume `smartgrow_data` at `/app/data/smartgrow.db`.
+- Backup snapshot safely exported on host at `backups/smartgrow_pre_migration_20261027.db`.
 
 ---
 
@@ -94,11 +96,12 @@ SmartGrow AI includes automated tests covering firmware, machine learning, backe
 
 | Test Suite | Command | What It Validates | Result |
 | :--- | :--- | :--- | :--- |
-| **Firmware Native Tests** | `gcc ... && ./test_firmware_native.exe` | Sensor calibration, safety watchdog, cooldown, command parsing, telemetry serialization | **30/30 PASS (100%)** |
-| **Edge AI Parity Test** | `gcc ... && ./test_ai_parity.exe` | 500 test vectors verified between Python scikit-learn and C transpiled code | **500/500 PASS (100%)** |
-| **Backend Integration** | `pytest backend/tests/test_backend_api.py` | Auth, device enrollment, telemetry schema validation, command lifecycle, automation rules | **7/7 PASS (100%)** |
-| **Vertical End-to-End** | `python tests/integration/test_end_to_end_flow.py` | Sensor -> Firmware -> Backend -> Database -> Frontend -> Command -> ACK | **VERIFIED PASS** |
-| **HIL Runner** | `python tests/hil/hil_runner.py` | Physical board probe or high-fidelity simulation fallback | **PASS** |
+| **Firmware Native Tests** | `.\firmware\test\test_firmware_native.exe` | Sensor calibration, safety watchdog, cooldown, command parsing, telemetry serialization, NVS rollback, latch | **287/287 PASS (100.0%)** |
+| **Edge AI Parity Test** | `.\firmware\test\test_ai_parity.exe` | 500 test vectors verified between Python scikit-learn and C transpiled code | **500/500 PASS (100.0%)** |
+| **Backend Integration & Unit**| `pytest /app/backend/tests -v` (Docker) | Auth, device enrollment, telemetry schema validation, command lifecycle, automation rules, security resilience | **22/22 PASS (100.0%)** |
+| **Vertical End-to-End** | `pytest /app/tests -v` (Docker) | Sensor -> Firmware -> Backend -> Database -> Frontend -> Command -> ACK vertical slice | **2/2 PASS (100.0%)** |
+| **Frontend Production Build** | `npm run build` (Vue 3 / TS) | Vue 3 SFC compilation, TypeScript strict type-checking (`vue-tsc --noEmit`), Vite production bundling | **115/115 modules PASS** |
+| **ML Model Evaluation** | `python /app/ml/evaluation/evaluate_model.py`| Clean test set evaluation (100% accuracy) and sensor jitter robustness testing (98.20% accuracy) | **PASS** |
 
 ---
 
@@ -120,12 +123,12 @@ smartgrow-ai/
 │   │   ├── schemas/            # Request/Response Pydantic DTOs & validation
 │   │   ├── services/           # Business logic, automation engine, command lifecycle
 │   │   └── main.py             # FastAPI application entry point & background worker
-│   ├── tests/                  # Pytest integration test suite
+│   ├── tests/                  # Pytest integration test suite (22 unit & regression tests)
 │   ├── requirements.txt        # Backend dependencies
 │   └── Dockerfile              # Production container build
 ├── frontend/
 │   ├── src/
-│   │   ├── api/                # Axios API client
+│   │   ├── api/                # Axios API client & token interceptors
 │   │   ├── layouts/            # Industrial IoT AppLayout with sidebar & header
 │   │   ├── router/             # Vue Router connecting all 12 modules
 │   │   ├── stores/             # Pinia auth store
@@ -136,13 +139,14 @@ smartgrow-ai/
 ├── ml/
 │   ├── datasets/               # Synthesized agronomic dataset
 │   ├── training/               # Dataset generator & Decision Tree training script
-│   └── export/                 # Trained model & automated C transpiler
+│   ├── export/                 # Trained model & automated C transpiler
+│   └── evaluation/             # Model evaluation & noise robustness test script
 ├── tests/
-│   ├── integration/            # Full vertical end-to-end integration test
+│   ├── integration/            # Full vertical end-to-end integration tests
 │   └── hil/                    # Hardware-in-the-Loop test runner
 ├── deploy/
 │   └── docker-compose.yml      # Container orchestration
-├── docs/                       # Architecture, Hardware, API, AI, Testing, Deployment docs
+├── docs/                       # Comprehensive System Documentation & Re-Audit Guides
 ├── .github/workflows/          # GitHub Actions CI pipeline
 ├── .env.example                # Environment variable configuration template
 └── README.md
@@ -152,13 +156,23 @@ smartgrow-ai/
 
 ## 📚 Technical Documentation Index
 
-- [Architecture & Design Document](docs/architecture.md)
-- [Hardware Wiring & Sensor Calibration Guide](docs/hardware.md)
-- [REST API Specification (v1)](docs/api.md)
-- [Edge AI & TinyML Model Specification](docs/ai-model.md)
-- [Comprehensive Testing Guide](docs/testing.md)
-- [Deployment & Production Guide](docs/deployment.md)
-- [Phase Implementation Plan](docs/implementation-plan.md)
+### Re-Audit & Operational Guides (2026 Audit)
+- **[Final System Audit Report](docs/FINAL_SYSTEM_AUDIT_REPORT.md):** Báo cáo kiểm toán cuối cùng: Khắc phục lỗi lệch giờ (Timezone UTC+7), sửa nút Export CSV, và chứng minh tính bền vững của Database qua vòng đời container.
+- **[Full Project Re-Audit Report](docs/FULL_PROJECT_REAUDIT.md):** Báo cáo tổng kiểm toán toàn diện hệ thống với bằng chứng thực tế từ runtime, test suite và mã nguồn.
+- **[Database Runtime & Data Flow](docs/DATABASE_RUNTIME_AND_DATA_FLOW.md):** Xác định chính xác vị trí SQLite runtime trong container, bảng biểu, ERD, và phân tích rủi ro persistence.
+- **[Database Access & Editing Guide](docs/DATABASE_ACCESS_AND_EDITING_GUIDE.md):** Hướng dẫn mở, xem dữ liệu bằng DB Browser for SQLite, truy vấn CLI và sửa đổi dữ liệu an toàn.
+- **[Frontend Code & UI Audit](docs/FRONTEND_CODE_AND_UI_AUDIT.md):** Kiểm toán 12 views Vue 3, Pinia auth store, Axios interceptors, Vite proxy và khả năng chịu lỗi.
+- **[Frontend Run & Test Guide](docs/FRONTEND_RUN_AND_TEST_GUIDE.md):** Hướng dẫn khởi chạy frontend trên Windows qua Docker hoặc host, kèm checklist kiểm thử UI.
+- **[End-to-End Execution Guide](docs/END_TO_END_EXECUTION_GUIDE.md):** Truy vết chi tiết 3 luồng tích hợp end-to-end: Auth, Telemetry Ingestion và Điều khiển tưới an toàn.
+- **[Complete Codebase Functional Guide](docs/COMPLETE_CODEBASE_FUNCTIONAL_GUIDE.md):** Cẩm nang giải thích từng module, API endpoint, hàm nghiệp vụ và chuỗi gọi hàm của 5 phân hệ.
+- **[Docker Runtime & Debug Guide](docs/DOCKER_RUNTIME_AND_DEBUG_GUIDE.md):** Hướng dẫn Docker Compose, mạng container, phân giải DNS nội bộ, xem log và cứu hộ container.
+- **[Master Documentation Index](docs/PROJECT_DOCUMENTATION_INDEX.md):** Bản đồ tra cứu toàn bộ tài liệu trong dự án.
+
+### Hardware, Embedded & Machine Learning Reference
+- **[Hardware Wiring, GPIO Pinout & Installation](docs/HARDWARE_WIRING_AND_GPIO.md):** Sơ đồ chân GPIO ESP32-S3, đấu nối cảm biến đất, DHT11, LDR và relay máy bơm.
+- **[Firmware Configuration Guide](docs/FIRMWARE_CONFIGURATION_GUIDE.md):** Cấu hình FreeRTOS tasks, Wi-Fi, NVS fallback, Safety Gate 3 lớp và lệnh command poller.
+- **[ML Edge AI Deep Dive](docs/ML_EDGE_AI_DEEP_DIVE.md):** Phân tích chuyên sâu kiến trúc Decision Tree C transpiled, ma trận nhầm lẫn và kiểm thử nhiễu.
+- **[System Configuration Reference](docs/CONFIGURATION_REFERENCE.md):** Bảng tổng hợp toàn bộ thông số cấu hình của hệ thống.
 
 ---
 

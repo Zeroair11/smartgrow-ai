@@ -108,11 +108,11 @@
             </thead>
             <tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">
               <tr v-for="ev in inferences" :key="ev.id" class="hover:bg-slate-800/30">
-                <td class="p-2.5 text-slate-400">{{ new Date(ev.recorded_at).toLocaleTimeString() }}</td>
+                <td class="p-2.5 text-slate-400">{{ formatDateTime(ev.recorded_at) }}</td>
                 <td class="p-2.5 text-slate-300">{{ ev.device_id }}</td>
                 <td class="p-2.5">
-                  <span class="text-cyan-400">{{ ev.soil_moisture_pct.toFixed(1) }}%</span> /
-                  <span class="text-amber-400">{{ ev.temperature_c.toFixed(1) }}°C</span>
+                  <span :class="ev.soil_moisture_pct != null ? 'text-cyan-400' : 'text-red-400'">{{ ev.soil_moisture_pct != null ? `${ev.soil_moisture_pct.toFixed(1)}%` : 'FAULT' }}</span> /
+                  <span :class="ev.temperature_c != null ? 'text-amber-400' : 'text-red-400'">{{ ev.temperature_c != null ? `${ev.temperature_c.toFixed(1)}°C` : 'FAULT' }}</span>
                 </td>
                 <td class="p-2.5">
                   <span
@@ -150,6 +150,7 @@
 import { ref, onMounted } from 'vue'
 import apiClient from '@/api/client'
 import type { AIInferenceEvent } from '@/types'
+import { formatDateTime } from '@/utils/date'
 
 const inferences = ref<AIInferenceEvent[]>([])
 

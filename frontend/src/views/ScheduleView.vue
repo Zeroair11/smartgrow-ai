@@ -49,7 +49,7 @@
         </div>
 
         <div class="text-[11px] font-mono text-slate-500">
-          Created: {{ new Date(sch.created_at).toLocaleDateString() }}
+          Created: {{ formatDate(sch.created_at) }}
         </div>
       </div>
     </div>
@@ -102,6 +102,7 @@
 import { ref, onMounted } from 'vue'
 import apiClient from '@/api/client'
 import type { IrrigationSchedule } from '@/types'
+import { formatDate } from '@/utils/date'
 
 const schedules = ref<IrrigationSchedule[]>([])
 const showModal = ref(false)

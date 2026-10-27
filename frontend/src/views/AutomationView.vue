@@ -52,7 +52,7 @@
         </div>
 
         <div class="flex items-center justify-between text-xs font-mono text-slate-400 pt-1">
-          <span>Last trigger: {{ rule.last_triggered_at ? new Date(rule.last_triggered_at).toLocaleTimeString() : 'Never' }}</span>
+          <span>Last trigger: {{ formatDateTime(rule.last_triggered_at, 'Never') }}</span>
           <button @click="deleteRule(rule.id)" class="text-slate-500 hover:text-rose-400">Delete</button>
         </div>
       </div>
@@ -94,7 +94,7 @@
           </thead>
           <tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">
             <tr v-for="ev in ruleEvents" :key="ev.id" class="hover:bg-slate-800/30">
-              <td class="p-3 text-slate-400">{{ new Date(ev.triggered_at).toLocaleTimeString() }}</td>
+              <td class="p-3 text-slate-400">{{ formatDateTime(ev.triggered_at) }}</td>
               <td class="p-3 text-slate-300">#RULE-{{ ev.rule_id }}</td>
               <td class="p-3 text-emerald-400">{{ ev.device_id }}</td>
               <td class="p-3 text-cyan-400 font-bold">{{ ev.metric_val.toFixed(1) }}</td>
@@ -184,6 +184,7 @@
 import { ref, onMounted } from 'vue'
 import apiClient from '@/api/client'
 import type { AutomationRule, AutomationRuleEvent } from '@/types'
+import { formatDateTime } from '@/utils/date'
 
 const rules = ref<AutomationRule[]>([])
 const ruleEvents = ref<AutomationRuleEvent[]>([])

@@ -12,9 +12,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    watch: {
+      usePolling: true,
+      interval: 800
+    },
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.BACKEND_URL || 'http://127.0.0.1:8000',
         changeOrigin: true
       }
     }

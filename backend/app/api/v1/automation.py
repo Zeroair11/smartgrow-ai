@@ -18,7 +18,7 @@ def list_rules(zone_id: Optional[int] = None, db: Session = Depends(get_db), cur
 
 @router.post("/rules", response_model=AutomationRuleRead, status_code=status.HTTP_201_CREATED)
 def create_rule(rule_in: AutomationRuleCreate, db: Session = Depends(get_db), current_user: User = Depends(require_operator)):
-    rule = AutomationRule(**rule_in.dict())
+    rule = AutomationRule(**rule_in.model_dump())
     db.add(rule)
     db.commit()
     db.refresh(rule)
@@ -30,11 +30,11 @@ def update_rule(rule_id: int, rule_in: AutomationRuleCreate, db: Session = Depen
     rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
-    for k, v in rule_in.dict().items():
+    for k, v in rule_in.model_dump().items():
         setattr(rule, k, v)
     db.commit()
     db.refresh(rule)
-    log_audit(db, current_user.id, current_user.email, "UPDATE_AUTOMATION_RULE", "AUTOMATION_RULE", str(rule.id), rule_in.dict())
+    log_audit(db, current_user.id, current_user.email, "UPDATE_AUTOMATION_RULE", "AUTOMATION_RULE", str(rule.id), rule_in.model_dump())
     return rule
 
 @router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)

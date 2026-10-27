@@ -15,6 +15,14 @@ def evaluate_automation_rules(db: Session, reading: SensorReading):
     now = datetime.now(timezone.utc)
 
     for rule in rules:
+        # Guard: never trigger automated actions on invalid or faulted sensor data
+        if rule.sensor_metric == "soil_moisture_pct" and not reading.soil_valid:
+            continue
+        if rule.sensor_metric in ("temperature_c", "humidity_pct") and not reading.dht_valid:
+            continue
+        if rule.sensor_metric == "light_level_pct" and not reading.light_valid:
+            continue
+
         # Check metric value from reading
         val = getattr(reading, rule.sensor_metric, None)
         if val is None:
@@ -55,10 +63,14 @@ def evaluate_automation_rules(db: Session, reading: SensorReading):
         # Action execution
         if rule.action_type in ["PUMP_START", "PUMP_STOP", "VENT_SET"]:
             try:
+                duration_val = int(rule.action_param_val) if rule.action_type == "PUMP_START" else 0
+                if rule.action_type == "PUMP_START" and duration_val > 120:
+                    duration_val = 120  # Enforce safety guardrail clamp
+
                 cmd_in = CommandCreate(
                     command_type=rule.action_type,
-                    param_val=rule.action_param_val,
-                    duration_s=int(rule.action_param_val) if rule.action_type == "PUMP_START" else 0,
+                    param_val=float(duration_val) if rule.action_type == "PUMP_START" else rule.action_param_val,
+                    duration_s=duration_val,
                     ttl_s=300
                 )
                 create_command(db, reading.device_id, cmd_in)

@@ -24,6 +24,9 @@ typedef struct {
     float       temperature_c;
     float       humidity_pct;
     float       light_level_pct;
+    bool        soil_valid;
+    bool        dht_valid;
+    bool        light_valid;
     int         ai_class;
     float       ai_confidence;
     const char* model_version;

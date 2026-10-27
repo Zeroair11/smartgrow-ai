@@ -88,7 +88,7 @@
               <td class="p-3 text-slate-400 font-mono text-[10px] truncate max-w-xs">{{ rel.checksum_sha256 }}</td>
               <td class="p-3 text-slate-300">{{ (rel.file_size_bytes / 1024).toFixed(1) }} KB</td>
               <td class="p-3 text-slate-300">{{ rel.release_notes || 'Stable build' }}</td>
-              <td class="p-3 text-slate-400">{{ new Date(rel.created_at).toLocaleDateString() }}</td>
+              <td class="p-3 text-slate-400">{{ formatDate(rel.created_at) }}</td>
             </tr>
             <tr v-if="releases.length === 0">
               <td colspan="5" class="p-6 text-center text-slate-500 font-mono">
@@ -106,6 +106,7 @@
 import { ref, onMounted } from 'vue'
 import apiClient from '@/api/client'
 import type { FirmwareRelease } from '@/types'
+import { formatDate } from '@/utils/date'
 
 const releases = ref<FirmwareRelease[]>([])
 

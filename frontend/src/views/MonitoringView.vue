@@ -17,13 +17,15 @@
           <option v-for="dev in devices" :key="dev.id" :value="dev.device_id">{{ dev.name }} ({{ dev.device_id }})</option>
         </select>
 
-        <a
-          href="/api/v1/telemetry/export-csv"
-          target="_blank"
-          class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-all flex items-center gap-1.5"
+        <button
+          @click="handleExportCsv"
+          :disabled="isExporting"
+          class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-slate-200 text-xs font-medium border border-slate-700 transition-all flex items-center gap-1.5"
         >
-          <span>📥</span> Export CSV
-        </a>
+          <span v-if="isExporting" class="animate-spin text-emerald-400">⏳</span>
+          <span v-else>📥</span>
+          <span>{{ isExporting ? 'Exporting...' : 'Export CSV' }}</span>
+        </button>
 
         <button
           @click="fetchTelemetry"
@@ -32,6 +34,16 @@
           <span>🔄</span> Refresh
         </button>
       </div>
+    </div>
+
+    <!-- Export Notification Toast -->
+    <div
+      v-if="toastMessage"
+      class="px-4 py-2.5 rounded-xl border text-xs font-mono transition-all flex items-center justify-between"
+      :class="toastMessage.includes('Failed') ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'"
+    >
+      <span>{{ toastMessage }}</span>
+      <button @click="toastMessage = null" class="text-slate-400 hover:text-white ml-2">✕</button>
     </div>
 
     <!-- Live Telemetry Stream Cards Grid -->
@@ -108,12 +120,12 @@
           <tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">
             <tr v-for="r in readings" :key="r.id" class="hover:bg-slate-800/30 transition-colors">
               <td class="p-3 font-semibold text-slate-300">#{{ r.sequence }}</td>
-              <td class="p-3 text-slate-400">{{ new Date(r.recorded_at).toLocaleTimeString() }}</td>
+              <td class="p-3 text-slate-400">{{ formatDateTime(r.recorded_at) }}</td>
               <td class="p-3 text-emerald-400">{{ r.device_id }}</td>
-              <td class="p-3 text-cyan-400 font-semibold">{{ r.soil_moisture_pct.toFixed(1) }}%</td>
-              <td class="p-3 text-amber-400 font-semibold">{{ r.temperature_c.toFixed(1) }}°C</td>
-              <td class="p-3 text-indigo-400">{{ r.humidity_pct.toFixed(1) }}%</td>
-              <td class="p-3 text-yellow-400">{{ r.light_level_pct.toFixed(1) }}%</td>
+              <td class="p-3 font-semibold" :class="r.soil_moisture_pct != null ? 'text-cyan-400' : 'text-red-400'">{{ r.soil_moisture_pct != null ? `${r.soil_moisture_pct.toFixed(1)}%` : 'FAULT' }}</td>
+              <td class="p-3 font-semibold" :class="r.temperature_c != null ? 'text-amber-400' : 'text-red-400'">{{ r.temperature_c != null ? `${r.temperature_c.toFixed(1)}°C` : 'FAULT' }}</td>
+              <td class="p-3" :class="r.humidity_pct != null ? 'text-indigo-400' : 'text-red-400'">{{ r.humidity_pct != null ? `${r.humidity_pct.toFixed(1)}%` : 'FAULT' }}</td>
+              <td class="p-3" :class="r.light_level_pct != null ? 'text-yellow-400' : 'text-red-400'">{{ r.light_level_pct != null ? `${r.light_level_pct.toFixed(1)}%` : 'FAULT' }}</td>
               <td class="p-3">
                 <span
                   class="px-2 py-0.5 rounded text-[10px] font-bold"
@@ -154,12 +166,40 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '@/api/client'
 import type { SensorReading, Device } from '@/types'
+import { formatDateTime } from '@/utils/date'
+import { downloadCsvFromApi } from '@/utils/csv'
 
 const readings = ref<SensorReading[]>([])
 const devices = ref<Device[]>([])
 const selectedDeviceId = ref('')
+const isExporting = ref(false)
+const toastMessage = ref<string | null>(null)
 
 let pollTimer: any = null
+
+async function handleExportCsv() {
+  if (isExporting.value) return
+  isExporting.value = true
+  toastMessage.value = null
+  try {
+    const params: Record<string, any> = { limit: 1000 }
+    if (selectedDeviceId.value) {
+      params.device_id = selectedDeviceId.value
+    }
+    const filename = await downloadCsvFromApi('/telemetry/export-csv', {
+      params,
+      defaultFilename: `smartgrow_telemetry_${Date.now()}.csv`
+    })
+    toastMessage.value = `Successfully exported ${filename}`
+    setTimeout(() => { toastMessage.value = null }, 3500)
+  } catch (err: any) {
+    console.error('Failed to export CSV', err)
+    toastMessage.value = 'Failed to export CSV. Please check authentication and network.'
+    setTimeout(() => { toastMessage.value = null }, 4000)
+  } finally {
+    isExporting.value = false
+  }
+}
 
 const AI_LABELS: Record<number, string> = {
   0: 'NORMAL',
@@ -195,37 +235,43 @@ async function fetchDevices() {
 }
 
 const avgSoilMoisture = computed(() => {
-  if (readings.value.length === 0) return 0
-  const sum = readings.value.reduce((acc, r) => acc + r.soil_moisture_pct, 0)
-  return sum / readings.value.length
+  const valid = readings.value.filter(r => r.soil_moisture_pct != null)
+  if (valid.length === 0) return 0
+  const sum = valid.reduce((acc, r) => acc + (r.soil_moisture_pct || 0), 0)
+  return sum / valid.length
 })
 
 const avgTemperature = computed(() => {
-  if (readings.value.length === 0) return 0
-  const sum = readings.value.reduce((acc, r) => acc + r.temperature_c, 0)
-  return sum / readings.value.length
+  const valid = readings.value.filter(r => r.temperature_c != null)
+  if (valid.length === 0) return 0
+  const sum = valid.reduce((acc, r) => acc + (r.temperature_c || 0), 0)
+  return sum / valid.length
 })
 
 const minTemp = computed(() => {
-  if (readings.value.length === 0) return 0
-  return Math.min(...readings.value.map(r => r.temperature_c))
+  const valid = readings.value.filter(r => r.temperature_c != null).map(r => r.temperature_c as number)
+  if (valid.length === 0) return 0
+  return Math.min(...valid)
 })
 
 const maxTemp = computed(() => {
-  if (readings.value.length === 0) return 0
-  return Math.max(...readings.value.map(r => r.temperature_c))
+  const valid = readings.value.filter(r => r.temperature_c != null).map(r => r.temperature_c as number)
+  if (valid.length === 0) return 0
+  return Math.max(...valid)
 })
 
 const avgHumidity = computed(() => {
-  if (readings.value.length === 0) return 0
-  const sum = readings.value.reduce((acc, r) => acc + r.humidity_pct, 0)
-  return sum / readings.value.length
+  const valid = readings.value.filter(r => r.humidity_pct != null)
+  if (valid.length === 0) return 0
+  const sum = valid.reduce((acc, r) => acc + (r.humidity_pct || 0), 0)
+  return sum / valid.length
 })
 
 const avgLight = computed(() => {
-  if (readings.value.length === 0) return 0
-  const sum = readings.value.reduce((acc, r) => acc + r.light_level_pct, 0)
-  return sum / readings.value.length
+  const valid = readings.value.filter(r => r.light_level_pct != null)
+  if (valid.length === 0) return 0
+  const sum = valid.reduce((acc, r) => acc + (r.light_level_pct || 0), 0)
+  return sum / valid.length
 })
 
 onMounted(() => {

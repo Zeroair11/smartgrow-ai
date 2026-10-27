@@ -199,3 +199,46 @@ def test_automation_rules_evaluation(client):
     cmds = res.json()
     assert len(cmds) >= 1
     assert any(c["command_type"] == "PUMP_START" for c in cmds)
+
+def test_faulted_telemetry_ingest_and_alert(client):
+    token = get_admin_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    client.post("/api/v1/devices/register", json={
+        "device_id": "esp32s3-fault-dev",
+        "name": "Fault Test Device",
+        "registration_token": "smartgrow-device-enrollment-secret-2026"
+    })
+
+    # Telemetry with acquisition fault (DHT11 disconnected, Soil ADC open circuit)
+    fault_payload = {
+        "schema_version": "1.0.0",
+        "device_id": "esp32s3-fault-dev",
+        "sequence": 1,
+        "soil_moisture_pct": None,
+        "temperature_c": None,
+        "humidity_pct": None,
+        "light_level_pct": 80.0,
+        "soil_valid": False,
+        "dht_valid": False,
+        "light_valid": True,
+        "ai_class": 4, # SENSOR_FAULT
+        "pump_state": False
+    }
+
+    res = client.post("/api/v1/telemetry", json=fault_payload)
+    assert res.status_code == 201
+    reading = res.json()
+    assert reading["soil_valid"] is False
+    assert reading["dht_valid"] is False
+    assert reading["soil_moisture_pct"] is None
+    assert reading["temperature_c"] is None
+
+    # Check alert was created for sensor acquisition fault
+    res_alerts = client.get("/api/v1/alerts", headers=headers)
+    assert res_alerts.status_code == 200
+    alerts = res_alerts.json()
+    sensor_fault_alerts = [a for a in alerts if a["device_id"] == "esp32s3-fault-dev" and a["category"] == "sensor"]
+    assert len(sensor_fault_alerts) >= 1
+    assert "Sensor Acquisition Fault" in sensor_fault_alerts[0]["title"]
+

@@ -1,6 +1,6 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, validator
-from pydantic_settings import BaseSettings
+from pydantic import AnyHttpUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     APP_NAME: str = "SmartGrow AI"
@@ -29,8 +29,6 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_PASSWORD: str = "Admin@SmartGrow2026!"
     INITIAL_ADMIN_FULL_NAME: str = "Greenhouse System Administrator"
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

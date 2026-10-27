@@ -59,6 +59,8 @@ def deploy_ota_to_device(
     dev = db.query(Device).filter(Device.device_id == device_id).first()
     if not dev:
         raise HTTPException(status_code=404, detail="Device not found")
+    if dev.status in ["revoked", "decommissioned"]:
+        raise HTTPException(status_code=403, detail="Cannot deploy firmware to a revoked or decommissioned device")
     
     deployment = OTADeployment(
         release_id=release_id,

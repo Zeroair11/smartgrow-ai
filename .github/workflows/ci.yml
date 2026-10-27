@@ -26,8 +26,11 @@ jobs:
             firmware/src/actuator_manager.c \
             firmware/src/command_manager.c \
             firmware/src/telemetry_client.c \
+            firmware/src/wifi_manager.c \
+            firmware/src/network_client.c \
             firmware/src/edge_ai_model.c \
             firmware/src/edge_ai.c \
+            firmware/src/ota_manager.c \
             firmware/test/test_firmware_native.c \
             -o test_firmware_native
           ./test_firmware_native
@@ -62,7 +65,7 @@ jobs:
         env:
           PYTHONPATH: "."
         run: |
-          pytest backend/tests/test_backend_api.py -v
+          pytest tests/integration -v
 
       - name: Run Full End-to-End Vertical Integration Test
         env:
@@ -70,9 +73,15 @@ jobs:
         run: |
           python tests/integration/test_end_to_end_flow.py
 
+      - name: Run Firmware-Backend Contract Integration Test
+        env:
+          PYTHONPATH: "."
+        run: |
+          python tests/integration/test_firmware_backend_integration.py
+
       - name: Run HIL Runner (Simulation Mode)
         run: |
-          python tests/hil/hil_runner.py
+          python tests/hil/hil_runner.py --sim-only
 
   frontend-build:
     name: Frontend Vue 3 & TypeScript Build

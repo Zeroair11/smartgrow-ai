@@ -1,6 +1,6 @@
 /**
  * @file sensor_manager.h
- * @brief Sensor Acquisition, Plausibility Checks & Fault Diagnostics
+ * @brief Sensor Acquisition, DHT11 Integration, Plausibility Checks & Fault Diagnostics
  */
 
 #ifndef SENSOR_MANAGER_H
@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "sensor_calibration.h"
+#include "dht11.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,14 +30,24 @@ typedef struct {
 } SensorReadings;
 
 /**
- * @brief Initialize all sensor peripherals and ADC configuration
+ * @brief Initialize all sensor peripherals, ADC calibration and DHT11 driver
  */
 void sensor_manager_init(const SoilCalibrationConfig *calibration);
 
 /**
  * @brief Acquire a full set of sensor readings and perform plausibility checks
+ * @param out_readings Output structure for all sensor data and validity flags
+ * @return true if ALL critical sensors (soil moisture AND DHT11) are valid
  */
 bool sensor_manager_read_all(SensorReadings *out_readings);
+
+/**
+ * @brief Acquire sensor readings with explicit system timestamp
+ * @param out_readings Output structure
+ * @param now_ms Current system timestamp in milliseconds
+ * @return true if ALL critical sensors are valid
+ */
+bool sensor_manager_read_all_ex(SensorReadings *out_readings, uint32_t now_ms);
 
 /**
  * @brief Inject mocked sensor readings (used for native unit testing and HIL simulation)

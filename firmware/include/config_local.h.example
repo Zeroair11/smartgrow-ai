@@ -1,0 +1,31 @@
+/**
+ * @file config_local.h.example
+ * @brief Example template for developer-specific local configuration overrides
+ *
+ * INSTRUCTIONS:
+ * 1. Copy this file to 'config_local.h' in the same directory:
+ *    cp config_local.h.example config_local.h
+ * 2. Customize the defines below with your lab Wi-Fi, backend IP, and tokens.
+ * 3. 'config_local.h' is git-ignored and will NEVER be committed to Git.
+ */
+
+#ifndef CONFIG_LOCAL_H
+#define CONFIG_LOCAL_H
+
+/* Wi-Fi Overrides */
+// #define PROJECT_WIFI_SSID_DEFAULT            "MyHomeWiFi"
+// #define PROJECT_WIFI_PASSWORD_DEFAULT        "SuperSecretPassword"
+
+/* Backend Overrides */
+// #define PROJECT_BACKEND_HOST_DEFAULT         "192.168.1.100"
+// #define PROJECT_BACKEND_PORT_DEFAULT         8000
+// #define PROJECT_REGISTRATION_TOKEN_DEFAULT   "smartgrow-device-enrollment-secret-2026"
+
+/* Device Identity Override */
+// #define PROJECT_DEVICE_ID_DEFAULT            "esp32s3-custom-id"
+
+/* Sensor & Hardware Overrides */
+// #define PROJECT_PIN_DHT11                    4
+// #define PROJECT_DHT11_SAMPLE_INTERVAL_MS     2000
+
+#endif /* CONFIG_LOCAL_H */
